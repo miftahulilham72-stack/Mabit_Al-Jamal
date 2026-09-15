@@ -16,7 +16,7 @@
             color: #1e293b;
         }
         
-        /* ===== SIDEBAR MODERN ===== */
+        /* ===== SIDEBAR ===== */
         .sidebar {
             position: fixed;
             top: 0;
@@ -141,14 +141,14 @@
             font-weight: 500;
         }
         
-        /* ===== TOPBAR MODERN ===== */
+        /* ===== TOPBAR ===== */
         .topbar {
             position: fixed;
             top: 0;
             left: 270px;
             right: 0;
             height: 72px;
-            background: rgba(255,255,255,0.85);
+            background: rgba(255,255,255,0.95);
             backdrop-filter: blur(20px);
             -webkit-backdrop-filter: blur(20px);
             z-index: 30;
@@ -162,6 +162,7 @@
         .topbar-title { font-size: 17px; font-weight: 800; color: #0f172a; letter-spacing: -0.3px; }
         .topbar-subtitle { font-size: 12px; color: #64748b; font-weight: 500; margin-top: 1px; }
         .topbar-right { display: flex; align-items: center; gap: 10px; }
+        
         .topbar-btn {
             width: 42px;
             height: 42px;
@@ -183,7 +184,8 @@
             transform: translateY(-2px);
             box-shadow: 0 4px 12px rgba(59,130,246,0.15);
         }
-        .topbar-btn i { font-size: 19px; }
+        .topbar-btn i { font-size: 19px; pointer-events: none; }
+        
         .topbar-profile {
             display: flex;
             align-items: center;
@@ -219,6 +221,40 @@
             padding: 96px 28px 28px 28px;
             min-height: 100vh;
         }
+        
+        /* ===== MODAL & DROPDOWN ===== */
+        .dropdown-menu {
+            display: none;
+            position: absolute;
+            right: 0;
+            top: 52px;
+            background: #fff;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+            border: 1px solid #e2e8f0;
+            z-index: 9999;
+            overflow: hidden;
+            animation: dropdownIn 0.2s ease;
+        }
+        .dropdown-menu.show { display: block; }
+        
+        @keyframes dropdownIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .search-modal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(15,23,42,0.6);
+            backdrop-filter: blur(8px);
+            z-index: 10000;
+            align-items: flex-start;
+            justify-content: center;
+            padding: 80px 20px;
+        }
+        .search-modal.show { display: flex; }
         
         /* ===== MOBILE ===== */
         .menu-toggle {
@@ -296,14 +332,18 @@
         .btn-success:hover { box-shadow: 0 8px 24px rgba(16,185,129,0.4); }
         .btn-danger { background: linear-gradient(135deg, #ef4444, #dc2626); color: #fff; box-shadow: 0 4px 16px rgba(239,68,68,0.3); }
         .btn-danger:hover { box-shadow: 0 8px 24px rgba(239,68,68,0.4); }
-        .btn-warning { background: linear-gradient(135deg, #f59e0b, #d97706); color: #fff; box-shadow: 0 4px 16px rgba(245,158,11,0.3); }
         .btn-outline { background: #fff; color: #475569; border: 2px solid #e2e8f0; }
         .btn-outline:hover { border-color: #3b82f6; color: #3b82f6; }
+        
+        .spinner { animation: spin 0.8s linear infinite; }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
+    <!-- Overlay Mobile -->
     <div id="sidebar-overlay" class="sidebar-overlay" onclick="toggleSidebar()"></div>
 
+    <!-- Sidebar -->
     <aside class="sidebar" id="sidebar">
         <div class="sidebar-logo">
             <div class="icon"><i class="bi bi-mortarboard-fill"></i></div>
@@ -339,7 +379,7 @@
 
         <div class="menu-section">Mode Kiosk</div>
         <nav>
-            <a href="{{ route('absensi.kiosk') }}" target="_blank" class="menu-item" style="color:#10b981;">
+            <a href="{{ route('kiosk') }}" target="_blank" class="menu-item" style="color:#10b981;">
                 <i class="bi bi-display"></i> Buka Kiosk
                 <i class="bi bi-box-arrow-up-right" style="font-size:14px;margin-left:auto;"></i>
             </a>
@@ -356,6 +396,7 @@
         </div>
     </aside>
 
+    <!-- Topbar -->
     <div class="topbar">
         <div class="topbar-left">
             <button class="menu-toggle" onclick="toggleSidebar()">
@@ -367,23 +408,139 @@
             </div>
         </div>
         <div class="topbar-right">
-            <button class="topbar-btn">
+            <!-- SEARCH BUTTON -->
+            <button class="topbar-btn" onclick="openSearch()" title="Pencarian">
                 <i class="bi bi-search"></i>
             </button>
-            <button class="topbar-btn">
-                <i class="bi bi-bell"></i>
-                <span style="position:absolute;top:10px;right:10px;width:8px;height:8px;background:#ef4444;border-radius:50%;border:2px solid #fff;"></span>
-            </button>
-            <div class="topbar-profile">
-                <div class="avatar">A</div>
-                <div class="info">
-                    <span class="name">Admin</span>
-                    <span class="role">Administrator</span>
+            
+            <!-- NOTIFICATION BUTTON -->
+            <div style="position:relative;">
+                <button class="topbar-btn" onclick="toggleNotif(event)" title="Notifikasi">
+                    <i class="bi bi-bell"></i>
+                    <span id="notifBadge" style="position:absolute;top:8px;right:8px;width:8px;height:8px;background:#ef4444;border-radius:50%;border:2px solid #fff;"></span>
+                </button>
+                
+                <!-- Notification Dropdown -->
+                <div id="notifDropdown" class="dropdown-menu" style="width:360px;">
+                    <div style="padding:16px 20px;border-bottom:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center;">
+                        <span style="font-weight:800;font-size:14px;color:#0f172a;display:flex;align-items:center;gap:8px;">
+                            <i class="bi bi-bell-fill" style="color:#3b82f6;"></i> Notifikasi
+                        </span>
+                        <button onclick="tandaiSemuaDibaca(event)" style="background:none;border:none;color:#3b82f6;cursor:pointer;font-size:11px;font-weight:700;padding:4px 8px;border-radius:6px;transition:background 0.2s;" onmouseover="this.style.background='#eff6ff'" onmouseout="this.style.background='none'">
+                            <i class="bi bi-check2-all"></i> Tandai Semua
+                        </button>
+                    </div>
+                    <div id="notifList" style="max-height:360px;overflow-y:auto;">
+                        <div class="notif-item" data-id="1" style="padding:14px 20px;border-bottom:1px solid #f1f5f9;position:relative;transition:background 0.2s;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background=''">
+                            <div style="display:flex;gap:12px;">
+                                <div style="width:38px;height:38px;background:linear-gradient(135deg,#3b82f6,#2563eb);border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 4px 12px rgba(59,130,246,0.3);">
+                                    <i class="bi bi-info-circle-fill" style="color:#fff;font-size:16px;"></i>
+                                </div>
+                                <div style="flex:1;">
+                                    <p style="font-size:13px;font-weight:700;color:#0f172a;">Selamat Datang!</p>
+                                    <p style="font-size:12px;color:#64748b;margin-top:2px;line-height:1.5;">Sistem absensi MABIT SDI Al-Jamal siap digunakan.</p>
+                                    <p style="font-size:10px;color:#94a3b8;margin-top:6px;font-weight:600;"><i class="bi bi-clock"></i> Baru saja</p>
+                                </div>
+                            </div>
+                            <span class="notif-dot" style="position:absolute;top:18px;right:16px;width:8px;height:8px;background:#3b82f6;border-radius:50%;"></span>
+                        </div>
+                        <div class="notif-item" data-id="2" style="padding:14px 20px;border-bottom:1px solid #f1f5f9;position:relative;transition:background 0.2s;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background=''">
+                            <div style="display:flex;gap:12px;">
+                                <div style="width:38px;height:38px;background:linear-gradient(135deg,#10b981,#059669);border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 4px 12px rgba(16,185,129,0.3);">
+                                    <i class="bi bi-people-fill" style="color:#fff;font-size:16px;"></i>
+                                </div>
+                                <div style="flex:1;">
+                                    <p style="font-size:13px;font-weight:700;color:#0f172a;">Data Panitia</p>
+                                    <p style="font-size:12px;color:#64748b;margin-top:2px;line-height:1.5;">Terdapat <strong>{{ \App\Models\Panitia::count() }}</strong> panitia terdaftar di sistem.</p>
+                                    <p style="font-size:10px;color:#94a3b8;margin-top:6px;font-weight:600;"><i class="bi bi-clock"></i> Baru saja</p>
+                                </div>
+                            </div>
+                            <span class="notif-dot" style="position:absolute;top:18px;right:16px;width:8px;height:8px;background:#3b82f6;border-radius:50%;"></span>
+                        </div>
+                        @if(\App\Models\SesiPanitia::where('is_active', true)->exists())
+                        <div class="notif-item" data-id="3" style="padding:14px 20px;border-bottom:1px solid #f1f5f9;position:relative;transition:background 0.2s;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background=''">
+                            <div style="display:flex;gap:12px;">
+                                <div style="width:38px;height:38px;background:linear-gradient(135deg,#f59e0b,#d97706);border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 4px 12px rgba(245,158,11,0.3);">
+                                    <i class="bi bi-broadcast" style="color:#fff;font-size:16px;"></i>
+                                </div>
+                                <div style="flex:1;">
+                                    <p style="font-size:13px;font-weight:700;color:#0f172a;">Sesi Aktif</p>
+                                    <p style="font-size:12px;color:#64748b;margin-top:2px;line-height:1.5;">Sesi <strong>{{ \App\Models\SesiPanitia::where('is_active', true)->first()->nama_sesi }}</strong> sedang berlangsung.</p>
+                                    <p style="font-size:10px;color:#94a3b8;margin-top:6px;font-weight:600;"><i class="bi bi-clock"></i> Baru saja</p>
+                                </div>
+                            </div>
+                            <span class="notif-dot" style="position:absolute;top:18px;right:16px;width:8px;height:8px;background:#3b82f6;border-radius:50%;"></span>
+                        </div>
+                        @endif
+                    </div>
+                    <div id="notifEmpty" style="display:none;padding:50px 20px;text-align:center;">
+                        <i class="bi bi-check2-circle" style="font-size:48px;color:#10b981;display:block;margin-bottom:12px;"></i>
+                        <p style="font-size:14px;font-weight:700;color:#0f172a;">Semua sudah dibaca</p>
+                        <p style="font-size:12px;color:#94a3b8;margin-top:4px;">Tidak ada notifikasi baru</p>
+                    </div>
+                    <div id="notifFooter" style="padding:12px 20px;background:#f8fafc;text-align:center;border-top:1px solid #e2e8f0;">
+                        <span style="font-size:12px;color:#64748b;font-weight:600;"><i class="bi bi-inbox"></i> <span id="notifCount">{{ \App\Models\SesiPanitia::where('is_active', true)->exists() ? 3 : 2 }}</span> notifikasi belum dibaca</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- PROFILE DROPDOWN (HANYA LOGOUT) -->
+            <div style="position:relative;">
+                <div class="topbar-profile" onclick="toggleProfile(event)">
+                    <div class="avatar">A</div>
+                    <div class="info">
+                        <span class="name">Admin</span>
+                        <span class="role">Administrator</span>
+                    </div>
+                    <i class="bi bi-chevron-down" style="font-size:12px;color:#94a3b8;"></i>
+                </div>
+                <div id="profileDropdown" class="dropdown-menu" style="width:220px;">
+                    <div style="padding:16px 20px;border-bottom:1px solid #e2e8f0;">
+                        <div style="display:flex;align-items:center;gap:12px;">
+                            <div style="width:44px;height:44px;background:linear-gradient(135deg,#3b82f6,#8b5cf6);border-radius:12px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:18px;">A</div>
+                            <div style="overflow:hidden;">
+                                <p style="font-size:14px;font-weight:800;color:#0f172a;">Admin</p>
+                                <p style="font-size:11px;color:#64748b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ Auth::user()->email ?? 'admin@sdialjamal.sch.id' }}</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div style="padding:8px;">
+                        <form method="POST" action="{{ route('logout') }}">
+                            @csrf
+                            <button type="submit" style="display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:10px;color:#ef4444;background:none;border:none;font-size:13px;font-weight:700;cursor:pointer;width:100%;text-align:left;transition:all 0.2s;" onmouseover="this.style.background='#fef2f2';this.style.transform='translateX(3px)'" onmouseout="this.style.background='none';this.style.transform='translateX(0)'">
+                                <i class="bi bi-box-arrow-right" style="font-size:18px;"></i>
+                                <span>Keluar dari Sistem</span>
+                            </button>
+                        </form>
+                    </div>
+                    <div style="padding:10px 20px;border-top:1px solid #f1f5f9;text-align:center;">
+                        <p style="font-size:10px;color:#94a3b8;font-weight:500;">v1.0.0 | MABIT SDI Al-Jamal</p>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
+    <!-- SEARCH MODAL -->
+    <div id="searchModal" class="search-modal" onclick="if(event.target===this) closeSearch()">
+        <div style="background:#fff;border-radius:20px;max-width:640px;width:100%;box-shadow:0 25px 80px rgba(0,0,0,0.3);overflow:hidden;">
+            <div style="padding:20px 24px;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;gap:12px;">
+                <i class="bi bi-search" style="font-size:20px;color:#64748b;"></i>
+                <input type="text" id="searchInput" placeholder="Cari panitia berdasarkan nama atau ID..." 
+                       style="flex:1;border:none;outline:none;font-size:16px;font-weight:500;color:#0f172a;background:none;"
+                       onkeyup="searchPanitia(this.value)">
+                <button onclick="closeSearch()" style="background:none;border:none;color:#94a3b8;cursor:pointer;font-size:12px;font-weight:700;padding:6px 12px;border-radius:8px;border:1px solid #e2e8f0;">ESC</button>
+            </div>
+            <div id="searchResults" style="max-height:400px;overflow-y:auto;">
+                <div style="padding:40px 20px;text-align:center;color:#94a3b8;">
+                    <i class="bi bi-search" style="font-size:36px;display:block;margin-bottom:12px;color:#cbd5e1;"></i>
+                    <p style="font-size:13px;font-weight:600;">Ketik untuk mencari panitia...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
     <div class="main-content">
         @yield('content')
     </div>
@@ -391,18 +548,193 @@
     @stack('scripts')
 
     <script>
+        // ================================================================
+        // TOGGLE SIDEBAR
+        // ================================================================
         function toggleSidebar() {
             const sidebar = document.getElementById('sidebar');
             const overlay = document.getElementById('sidebar-overlay');
             sidebar.classList.toggle('open');
             overlay.classList.toggle('open');
         }
-        document.addEventListener('keydown', function(e) {
-            if (e.key === 'Escape') {
-                const sidebar = document.getElementById('sidebar');
-                if (sidebar.classList.contains('open')) toggleSidebar();
+        
+        // ================================================================
+        // SEARCH MODAL
+        // ================================================================
+        function openSearch() {
+            document.getElementById('searchModal').classList.add('show');
+            setTimeout(() => document.getElementById('searchInput').focus(), 100);
+        }
+        
+        function closeSearch() {
+            document.getElementById('searchModal').classList.remove('show');
+            document.getElementById('searchInput').value = '';
+            document.getElementById('searchResults').innerHTML = `
+                <div style="padding:40px 20px;text-align:center;color:#94a3b8;">
+                    <i class="bi bi-search" style="font-size:36px;display:block;margin-bottom:12px;color:#cbd5e1;"></i>
+                    <p style="font-size:13px;font-weight:600;">Ketik untuk mencari panitia...</p>
+                </div>
+            `;
+        }
+        
+        function searchPanitia(query) {
+            const resultsDiv = document.getElementById('searchResults');
+            
+            if (query.length < 2) {
+                resultsDiv.innerHTML = `
+                    <div style="padding:40px 20px;text-align:center;color:#94a3b8;">
+                        <i class="bi bi-search" style="font-size:36px;display:block;margin-bottom:12px;color:#cbd5e1;"></i>
+                        <p style="font-size:13px;font-weight:600;">Ketik minimal 2 karakter...</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            resultsDiv.innerHTML = `
+                <div style="padding:20px;text-align:center;color:#94a3b8;">
+                    <i class="bi bi-arrow-repeat spinner" style="font-size:24px;"></i>
+                    <p style="font-size:13px;margin-top:8px;">Mencari...</p>
+                </div>
+            `;
+            
+            fetch(`/panitia?search=${encodeURIComponent(query)}&ajax=1`, {
+                headers: { 'Accept': 'application/json' }
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.panitia && data.panitia.length > 0) {
+                    resultsDiv.innerHTML = data.panitia.map(p => `
+                        <a href="/panitia" style="display:flex;align-items:center;gap:12px;padding:14px 20px;border-bottom:1px solid #f1f5f9;text-decoration:none;color:#0f172a;transition:background 0.15s;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='none'">
+                            <div style="width:36px;height:36px;background:#3b82f615;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                                <i class="bi bi-person-fill" style="color:#3b82f6;font-size:16px;"></i>
+                            </div>
+                            <div style="flex:1;">
+                                <p style="font-size:13px;font-weight:700;color:#0f172a;">${p.nama_lengkap}</p>
+                                <p style="font-size:11px;color:#64748b;">${p.id_panitia} • ${p.jabatan || 'Panitia'}</p>
+                            </div>
+                            <i class="bi bi-arrow-right" style="color:#94a3b8;"></i>
+                        </a>
+                    `).join('');
+                } else {
+                    resultsDiv.innerHTML = `
+                        <div style="padding:40px 20px;text-align:center;color:#94a3b8;">
+                            <i class="bi bi-inbox" style="font-size:36px;display:block;margin-bottom:12px;color:#cbd5e1;"></i>
+                            <p style="font-size:13px;font-weight:600;">Tidak ada hasil untuk "${query}"</p>
+                        </div>
+                    `;
+                }
+            })
+            .catch(() => {
+                resultsDiv.innerHTML = `
+                    <div style="padding:40px 20px;text-align:center;color:#94a3b8;">
+                        <i class="bi bi-exclamation-triangle" style="font-size:36px;display:block;margin-bottom:12px;color:#f59e0b;"></i>
+                        <p style="font-size:13px;font-weight:600;">Terjadi kesalahan saat mencari</p>
+                    </div>
+                `;
+            });
+        }
+        
+        // ================================================================
+        // NOTIFICATION DROPDOWN
+        // ================================================================
+        function toggleNotif(event) {
+            event.stopPropagation();
+            const dropdown = document.getElementById('notifDropdown');
+            const profileDropdown = document.getElementById('profileDropdown');
+            
+            profileDropdown.classList.remove('show');
+            dropdown.classList.toggle('show');
+        }
+        
+        function closeNotif() {
+            document.getElementById('notifDropdown').classList.remove('show');
+        }
+        
+        // ================================================================
+        // PROFILE DROPDOWN
+        // ================================================================
+        function toggleProfile(event) {
+            event.stopPropagation();
+            const dropdown = document.getElementById('profileDropdown');
+            const notifDropdown = document.getElementById('notifDropdown');
+            
+            notifDropdown.classList.remove('show');
+            dropdown.classList.toggle('show');
+        }
+
+        // ================================================================
+        // NOTIFIKASI - TANDAI SEMUA DIBACA
+        // ================================================================
+        function tandaiSemuaDibaca(event) {
+            document.querySelectorAll('.notif-dot').forEach(dot => {
+                dot.style.display = 'none';
+            });
+
+            document.getElementById('notifBadge').style.display = 'none';
+            document.getElementById('notifList').style.display = 'none';
+            document.getElementById('notifEmpty').style.display = 'block';
+            document.getElementById('notifFooter').innerHTML = `
+                <span style="font-size:12px;color:#10b981;font-weight:700;">
+                    <i class="bi bi-check2-circle"></i> Semua notifikasi sudah dibaca
+                </span>
+            `;
+
+            localStorage.setItem('notifRead', 'true');
+
+            const btn = event?.target.closest('button');
+            if (btn) {
+                btn.innerHTML = '<i class="bi bi-check2-all"></i> Selesai!';
+                btn.style.color = '#10b981';
+                setTimeout(() => {
+                    btn.innerHTML = '<i class="bi bi-check2-all"></i> Tandai Semua';
+                    btn.style.color = '#3b82f6';
+                }, 2000);
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            if (localStorage.getItem('notifRead') === 'true') {
+                document.querySelectorAll('.notif-dot').forEach(dot => {
+                    dot.style.display = 'none';
+                });
+                document.getElementById('notifBadge').style.display = 'none';
+                document.getElementById('notifList').style.display = 'none';
+                document.getElementById('notifEmpty').style.display = 'block';
+                document.getElementById('notifFooter').innerHTML = `
+                    <span style="font-size:12px;color:#10b981;font-weight:700;">
+                        <i class="bi bi-check2-circle"></i> Semua notifikasi sudah dibaca
+                    </span>
+                `;
             }
         });
+        
+        // ================================================================
+        // TUTUP DROPDOWN JIKA KLIK DI LUAR
+        // ================================================================
+        document.addEventListener('click', function(e) {
+            const notifDropdown = document.getElementById('notifDropdown');
+            const profileDropdown = document.getElementById('profileDropdown');
+            
+            if (!e.target.closest('#notifDropdown') && !e.target.closest('[onclick*="toggleNotif"]')) {
+                notifDropdown.classList.remove('show');
+            }
+            if (!e.target.closest('#profileDropdown') && !e.target.closest('[onclick*="toggleProfile"]')) {
+                profileDropdown.classList.remove('show');
+            }
+        });
+        
+        // ================================================================
+        // ESC UNTUK MENUTUP MODAL
+        // ================================================================
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeSearch();
+                closeNotif();
+                document.getElementById('profileDropdown').classList.remove('show');
+            }
+        });
+        
+        console.log('✅ MABIT Admin Loaded');
     </script>
 </body>
 </html>

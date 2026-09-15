@@ -3,7 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Models\SesiPanitia;
+use App\Models\AbsensiPanitia;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 
 class SesiPanitiaController extends Controller
@@ -90,6 +94,57 @@ class SesiPanitiaController extends Controller
         $sesi->delete();
 
         return response()->json(['success' => true, 'message' => 'Sesi berhasil dihapus!']);
+    }
+
+    /**
+     * Hapus sesi dengan konfirmasi password admin
+     */
+    public function hapusDenganPassword(Request $request, $id)
+    {
+        $validator = Validator::make($request->all(), [
+            'password' => 'required|string',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Password harus diisi!',
+            ], 422);
+        }
+
+        $user = Auth::user();
+        if (!$user || !Hash::check($request->password, $user->password)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Password salah!',
+            ], 422);
+        }
+
+        $sesi = SesiPanitia::findOrFail($id);
+
+        if ($sesi->is_active) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Tidak bisa menghapus sesi yang sedang aktif! Nonaktifkan terlebih dahulu.',
+            ], 400);
+        }
+
+        try {
+            DB::transaction(function () use ($sesi) {
+                AbsensiPanitia::where('sesi_id', $sesi->id)->delete();
+                $sesi->delete();
+            });
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Sesi "' . $sesi->nama_sesi . '" berhasil dihapus!',
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal menghapus: ' . $e->getMessage(),
+            ], 500);
+        }
     }
 
     /**

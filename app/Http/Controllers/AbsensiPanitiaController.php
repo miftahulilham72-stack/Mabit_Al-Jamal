@@ -16,12 +16,139 @@ use PhpOffice\PhpSpreadsheet\Spreadsheet;
 class AbsensiPanitiaController extends Controller
 {
     /**
-     * Tampilkan halaman kiosk
+     * Tampilkan halaman KIOSK (menampilkan QR Code)
      */
     public function kiosk()
     {
         $sesiAktif = SesiPanitia::where('is_active', true)->first();
-        return view('absensi.kiosk', compact('sesiAktif'));
+
+        // Generate token unik untuk sesi ini
+        $token = $sesiAktif ? md5($sesiAktif->id . date('Y-m-d')) : null;
+
+        return view('kiosk.index', compact('sesiAktif', 'token'));
+    }
+
+    /**
+     * Tampilkan form absensi dari HP panitia
+     */
+    public function formHP($token)
+    {
+        // Validasi token
+        $sesiAktif = SesiPanitia::where('is_active', true)->first();
+
+        if (!$sesiAktif) {
+            return view('kiosk.expired', ['message' => 'Tidak ada sesi aktif saat ini.']);
+        }
+
+        $validToken = md5($sesiAktif->id . date('Y-m-d'));
+
+        if ($token !== $validToken) {
+            return view('kiosk.expired', ['message' => 'QR Code sudah tidak valid. Silakan scan ulang.']);
+        }
+
+        return view('kiosk.form', compact('sesiAktif', 'token'));
+    }
+
+    /**
+     * Cari panitia berdasarkan ID (untuk form HP)
+     */
+    public function cariPanitia($id_panitia)
+    {
+        $panitia = Panitia::where('id_panitia', $id_panitia)
+                          ->where('is_active', true)
+                          ->first();
+
+        if ($panitia) {
+            return response()->json([
+                'found' => true,
+                'nama' => $panitia->nama_lengkap,
+                'jabatan' => $panitia->jabatan,
+                'data' => $panitia,
+            ]);
+        }
+
+        return response()->json([
+            'found' => false,
+            'message' => 'ID Panitia tidak ditemukan',
+        ]);
+    }
+
+    /**
+     * Submit absensi dari HP panitia
+     */
+    public function submitHP(Request $request, $token)
+    {
+        $validator = Validator::make($request->all(), [
+            'id_panitia' => 'required|string|exists:panitia,id_panitia',
+            'ttd' => 'required|string|min:100',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => $validator->errors()->first(),
+            ], 422);
+        }
+
+        try {
+            DB::beginTransaction();
+
+            $id_panitia = $request->id_panitia;
+            $ttdBase64 = $request->ttd;
+
+            $panitia = Panitia::where('id_panitia', $id_panitia)
+                              ->where('is_active', true)
+                              ->first();
+            if (!$panitia) {
+                throw new \Exception('ID Panitia tidak ditemukan atau tidak aktif!');
+            }
+
+            $sesi = SesiPanitia::where('is_active', true)->first();
+            if (!$sesi) {
+                throw new \Exception('Tidak ada sesi aktif!');
+            }
+
+            $sudahAbsen = AbsensiPanitia::where('panitia_id', $panitia->id)
+                                        ->where('sesi_id', $sesi->id)
+                                        ->exists();
+            if ($sudahAbsen) {
+                throw new \Exception($panitia->nama_lengkap . ' sudah absen di sesi ini!');
+            }
+
+            $ttdPath = $this->saveTtdImage($ttdBase64, $id_panitia);
+            $jamSekarang = now()->format('H:i:s');
+            $status = $sesi->getStatus($jamSekarang);
+
+            AbsensiPanitia::create([
+                'panitia_id' => $panitia->id,
+                'sesi_id' => $sesi->id,
+                'jam_masuk' => $jamSekarang,
+                'status' => $status,
+                'keterangan' => 'Hadir',
+                'ttd_image' => $ttdPath,
+                'absen_manual' => false,
+                'diabsensi_oleh' => null,
+            ]);
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Halo ' . $panitia->nama_lengkap . '! Absen berhasil. Status: ' . $status,
+                'data' => [
+                    'nama' => $panitia->nama_lengkap,
+                    'jabatan' => $panitia->jabatan,
+                    'status' => $status,
+                ],
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 400);
+        }
     }
 
     /**

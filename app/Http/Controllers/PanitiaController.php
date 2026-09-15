@@ -25,6 +25,13 @@ class PanitiaController extends Controller
                   ->orWhere('jabatan', 'like', "%$search%");
             });
         }
+
+        // Response JSON untuk AJAX search
+        if ($request->ajax() || $request->has('ajax')) {
+            return response()->json([
+                'panitia' => $query->limit(10)->get(),
+            ]);
+        }
         
         $panitia = $query->orderBy('id_panitia')->paginate(15);
         $total = Panitia::count();
